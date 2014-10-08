@@ -207,6 +207,10 @@ class Money
 
       formatted = self.abs.to_s
 
+      if rules[:precision]
+        formatted = BigDecimal(formatted).round(rules[:precision]).to_s("F")
+      end
+
       if rules[:rounded_infinite_precision]
         formatted.gsub!(/#{currency.decimal_mark}/, '.') unless '.' == currency.decimal_mark
         formatted = ((BigDecimal(formatted) * currency.subunit_to_unit).round / BigDecimal(currency.subunit_to_unit.to_s)).to_s("F")
