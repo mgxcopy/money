@@ -206,6 +206,11 @@ class Money
       symbol_value = symbol_value_from(rules)
 
       formatted = self.abs.to_s
+      
+      if rules[:precision]
+        #this is safe alternative to to_s("F") to keep floating zeros
+        formatted = "%.#{rules[:precision]}f" % BigDecimal(formatted).round(rules[:precision])
+      end
 
       if rules[:rounded_infinite_precision]
         formatted.gsub!(/#{currency.decimal_mark}/, '.') unless '.' == currency.decimal_mark
