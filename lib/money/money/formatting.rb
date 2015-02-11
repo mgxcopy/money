@@ -189,6 +189,15 @@ class Money
     #   Money.new(100, "CAD").format(:disambiguate => false)   #=> "$100.00"
     #   Money.new(100, "USD").format(:disambiguate => true)    #=> "$100.00"
     #   Money.new(100, "CAD").format(:disambiguate => true)    #=> "C$100.00"
+    
+    def unformatted(*rules)
+      formatted = self.abs.to_s
+      
+      if rules[:precision]
+        #this is safe alternative to to_s("F") to keep floating zeros
+        BigDecimal(formatted).round(rules[:precision]).to_f
+      end
+    end  
 
     def format(*rules)
       # support for old format parameters
