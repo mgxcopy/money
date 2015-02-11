@@ -191,6 +191,9 @@ class Money
     #   Money.new(100, "CAD").format(:disambiguate => true)    #=> "C$100.00"
     
     def unformatted(*rules)
+      rules = normalize_formatting_rules(rules)
+      rules = localize_formatting_rules(rules)
+      
       formatted = self.abs.to_s
       
       if rules[:precision]
