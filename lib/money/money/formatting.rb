@@ -198,7 +198,7 @@ class Money
       
       if rules[:precision]
         #this is safe alternative to to_s("F") to keep floating zeros
-        BigDecimal(formatted).round(rules[:precision]).to_f
+        BigDecimal(formatted).round(rules[:precision])
       end
     end  
 
