@@ -1,31 +1,6 @@
 # encoding: UTF-8
 class Money
   module Formatting
-    def self.included(base)
-      [
-        [:thousands_separator, :delimiter, ","],
-        [:decimal_mark, :separator, "."]
-      ].each do |method, name, character|
-        define_i18n_method(method, name, character)
-      end
-    end
-
-    def self.define_i18n_method(method, name, character)
-      define_method(method) do
-        if self.class.use_i18n
-          I18n.t(
-            :"number.currency.format.#{name}", :default => I18n.t(
-              :"number.format.#{name}",
-              :default => (currency.send(method) || character)
-            )
-          )
-        else
-          currency.send(method) || character
-        end
-      end
-      alias_method name, method
-    end
-
     # Creates a formatted price string according to several rules.
     #
     # @param [Hash] rules The options used to format the string.
@@ -181,19 +156,55 @@ class Money
     #   Money.new(100, "GBP").format(:sign_positive => false, :sign_before_symbol => false) #=> "£1.00"
     #   Money.new(100, "GBP").format                               #=> "£+1.00"
     #
-    # @option *rules [Boolean] :disambiguate (false) Prevents the result from being ambiguous 
+    # @option *rules [Boolean] :disambiguate (false) Prevents the result from being ambiguous
     #  due to equal symbols for different currencies. Uses the `disambiguate_symbol`.
     #
     # @example
-    #   Money.new(100, "USD").format(:disambiguate => false)   #=> "$100.00"
-    #   Money.new(100, "CAD").format(:disambiguate => false)   #=> "$100.00"
-    #   Money.new(100, "USD").format(:disambiguate => true)    #=> "$100.00"
-    #   Money.new(100, "CAD").format(:disambiguate => true)    #=> "C$100.00"
-
+    #   Money.new(10000, "USD").format(:disambiguate => false)   #=> "$100.00"
+    #   Money.new(10000, "CAD").format(:disambiguate => false)   #=> "$100.00"
+    #   Money.new(10000, "USD").format(:disambiguate => true)    #=> "$100.00"
+    #   Money.new(10000, "CAD").format(:disambiguate => true)    #=> "C$100.00"
+    #
+    # @option *rules [Boolean] :html_wrap_symbol (false) Wraps the currency symbol
+    #  in a html <span> tag.
+    #
+    # @example
+    #   Money.new(10000, "USD").format(:disambiguate => false)
+    #   #=> "<span class=\"currency_symbol\">$100.00</span>
+    #
+    # @option *rules [Symbol] :symbol_position (:before) `:before` if the currency
+    #   symbol goes before the amount, `:after` if it goes after.
+    #
+    # @example
+    #   Money.new(10000, "USD").format(:symbol_position => :before) #=> "$100.00"
+    #   Money.new(10000, "USD").format(:symbol_position => :after)  #=> "100.00 $"
+    #
+    # @option *rules [Boolean] :translate (true) `true` Checks for custom
+    #   symbol definitions using I18n.
+    #
+    # @example
+    #   # With the following entry in the translation files:
+    #   # en:
+    #   #   number:
+    #   #     currency:
+    #   #       symbol:
+    #   #         CAD: "CAD$"
+    #   Money.new(10000, "CAD").format(:translate => true) #=> "CAD$100.00"
+    #
+    # @example
+    #   Money.new(89000, :btc).format(:drop_trailing_zeros => true) #=> B⃦0.00089
+    #   Money.new(110, :usd).format(:drop_trailing_zeros => true)   #=> $1.1
+    #
+    # Note that the default rules can be defined through +Money.default_formatting_rules+ hash.
+    #
+    # @see +Money.default_formatting_rules+ for more information.
     def format(*rules)
       # support for old format parameters
       rules = normalize_formatting_rules(rules)
+
+      rules = default_formatting_rules.merge(rules)
       rules = localize_formatting_rules(rules)
+      rules = translate_formatting_rules(rules) if rules[:translate]
 
       if fractional == 0
         if rules[:display_free].respond_to?(:to_str)
@@ -212,19 +223,25 @@ class Money
       end
 
       if rules[:rounded_infinite_precision]
-        formatted.gsub!(/#{currency.decimal_mark}/, '.') unless '.' == currency.decimal_mark
+        formatted.gsub!(/#{decimal_mark}/, '.') unless '.' == decimal_mark
         formatted = ((BigDecimal(formatted) * currency.subunit_to_unit).round / BigDecimal(currency.subunit_to_unit.to_s)).to_s("F")
         formatted.gsub!(/\..*/) do |decimal_part|
           decimal_part << '0' while decimal_part.length < (currency.decimal_places + 1)
           decimal_part
         end
-        formatted.gsub!(/\./, currency.decimal_mark) unless '.' == currency.decimal_mark
+        formatted.gsub!(/\./, decimal_mark) unless '.' == decimal_mark
       end
 
       sign = self.negative? ? '-' : ''
 
       if rules[:no_cents] || (rules[:no_cents_if_whole] && cents % currency.subunit_to_unit == 0)
         formatted = "#{formatted.to_i}"
+      end
+
+      # Inspiration: https://github.com/rails/rails/blob/16214d1108c31174c94503caced3855b0f6bad95/activesupport/lib/active_support/number_helper/number_to_rounded_converter.rb#L72-L79
+      if rules[:drop_trailing_zeros]
+        escaped_decimal_mark = Regexp.escape(decimal_mark)
+        formatted = formatted.sub(/(#{escaped_decimal_mark})(\d*[1-9])?0+\z/, '\1\2').sub(/#{escaped_decimal_mark}\z/, '')
       end
 
       thousands_separator_value = thousands_separator
@@ -273,7 +290,30 @@ class Money
       formatted
     end
 
+    def thousands_separator
+      i18n_format_for(:thousands_separator, :delimiter, ",")
+    end
+
+    def decimal_mark
+      i18n_format_for(:decimal_mark, :separator, ".")
+    end
+
+    alias_method :delimiter, :thousands_separator
+    alias_method :separator, :decimal_mark
+
     private
+
+    def i18n_format_for(method, name, character)
+      if self.class.use_i18n
+        begin
+          I18n.t name, :scope => "number.currency.format", :raise => true
+        rescue I18n::MissingTranslationData
+          I18n.t name, :scope =>"number.format", :default => (currency.send(method) || character)
+        end
+      else
+        currency.send(method) || character
+      end
+    end
 
     # Cleans up formatting rules.
     #
@@ -311,6 +351,10 @@ class Money
     end
   end
 
+  def default_formatting_rules
+    self.class.default_formatting_rules || {}
+  end
+
   def regexp_format(formatted, rules, decimal_mark, symbol_value)
     regexp_decimal = Regexp.escape(decimal_mark)
     if rules[:south_asian_number_formatting]
@@ -323,6 +367,15 @@ class Money
         /(\d)(?=(?:\d{3})+(?:[^\d]{1}|$))/
       end
     end
+  end
+
+  def translate_formatting_rules(rules)
+    begin
+      rules[:symbol] = I18n.t currency.iso_code, :scope => "number.currency.symbol", :raise => true
+    rescue I18n::MissingTranslationData
+      # Do nothing
+    end
+    rules
   end
 
   def localize_formatting_rules(rules)
@@ -354,7 +407,11 @@ class Money
 
   def symbol_position_from(rules)
     if rules.has_key?(:symbol_position)
-      rules[:symbol_position]
+      if [:before, :after].include?(rules[:symbol_position])
+        return rules[:symbol_position]
+      else
+        raise ArgumentError, ":symbol_position must be ':before' or ':after'"
+      end
     elsif currency.symbol_first?
       :before
     else

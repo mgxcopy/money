@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require "spec_helper"
-
 describe Money, "formatting" do
 
   BAR = '{ "priority": 1, "iso_code": "BAR", "iso_numeric": "840", "name": "Dollar with 4 decimal places", "symbol": "$", "subunit": "Cent", "subunit_to_unit": 10000, "symbol_first": true, "html_entity": "$", "decimal_mark": ".", "thousands_separator": ",", "smallest_denomination": 1 }'
@@ -95,6 +93,23 @@ describe Money, "formatting" do
         expect(money.decimal_mark).to eq ','
       end
     end
+
+    context "with number.currency.symbol.*" do
+      before :each do
+        reset_i18n
+        I18n.locale = :de
+        I18n.backend.store_translations(
+            :de,
+            :number => { :currency => { :symbol => { :CAD => "CAD$" } } }
+        )
+      end
+
+      subject(:money) { Money.empty("CAD") }
+
+      it "should use 'CAD$' as the currency symbol" do
+        expect(money.format(:translate => true)).to eq("CAD$0.00")
+      end
+    end
   end
 
   describe "#format" do
@@ -169,6 +184,40 @@ describe Money, "formatting" do
       expect(Money.euro(1_234_567_12).format(:no_cents => true)).to eq "€1.234.567"
     end
 
+    context 'when default_formatting_rules defines (display_free: true)' do
+      before do
+        Money.default_formatting_rules = { :display_free => "you won't pay a thing" }
+      end
+
+      after do
+        Money.default_formatting_rules = nil
+      end
+
+      context 'with no rule provided' do
+        it 'acknowledges default rule' do
+          expect(Money.new(0, 'USD').format).to eq "you won't pay a thing"
+        end
+      end
+
+      context 'with rule (display_free: false) provided' do
+        it 'acknowledges provided rule' do
+          expect(Money.new(0, 'USD').format(:display_free => false)).to eq '$0.00'
+        end
+      end
+    end
+
+    context 'when default_formatting_rules is not defined' do
+      before do
+        Money.default_formatting_rules = nil
+      end
+
+      context 'acknowledges provided rule' do
+        it 'acknowledges provided rule' do
+          expect(Money.new(100, 'USD').format(:with_currency => true)).to eq '$1.00 USD'
+        end
+      end
+    end
+
     describe ":with_currency option" do
       specify "(:with_currency option => true) works as documented" do
         expect(Money.ca_dollar(100).format(:with_currency => true)).to eq "$1.00 CAD"
@@ -191,13 +240,13 @@ describe Money, "formatting" do
       it "inserts thousand separators if symbol contains decimal mark and no_cents is true" do
         expect(Money.new(100000000, "AMD").format(:no_cents => true)).to eq "1,000,000 դր."
         expect(Money.new(100000000, "USD").format(:no_cents => true)).to eq "$1,000,000"
-        expect(Money.new(100000000, "RUB").format(:no_cents => true)).to eq "1.000.000 р."
+        expect(Money.new(100000000, "RUB").format(:no_cents => true)).to eq "1.000.000 ₽"
       end
 
       it "doesn't incorrectly format HTML" do
         money = ::Money.new(1999, "RUB")
         output = money.format(:html => true, :no_cents => true)
-        expect(output).to eq "19 &#x0440;&#x0443;&#x0431;"
+        expect(output).to eq "19 &#x20BD;"
       end
     end
 
@@ -207,8 +256,8 @@ describe Money, "formatting" do
         expect(Money.new(10034, "VUV").format(:no_cents_if_whole => true, :symbol => false)).to eq "10,034"
         expect(Money.new(10000, "MGA").format(:no_cents_if_whole => true, :symbol => false)).to eq "2,000"
         expect(Money.new(10034, "MGA").format(:no_cents_if_whole => true, :symbol => false)).to eq "2,006.4"
-        expect(Money.new(10000, "VND").format(:no_cents_if_whole => true, :symbol => false)).to eq "1.000"
-        expect(Money.new(10034, "VND").format(:no_cents_if_whole => true, :symbol => false)).to eq "1.003,4"
+        expect(Money.new(10000, "VND").format(:no_cents_if_whole => true, :symbol => false)).to eq "10.000"
+        expect(Money.new(10034, "VND").format(:no_cents_if_whole => true, :symbol => false)).to eq "10.034"
         expect(Money.new(10000, "USD").format(:no_cents_if_whole => true, :symbol => false)).to eq "100"
         expect(Money.new(10034, "USD").format(:no_cents_if_whole => true, :symbol => false)).to eq "100.34"
         expect(Money.new(10000, "IQD").format(:no_cents_if_whole => true, :symbol => false)).to eq "10"
@@ -220,8 +269,8 @@ describe Money, "formatting" do
         expect(Money.new(10034, "VUV").format(:no_cents_if_whole => false, :symbol => false)).to eq "10,034"
         expect(Money.new(10000, "MGA").format(:no_cents_if_whole => false, :symbol => false)).to eq "2,000.0"
         expect(Money.new(10034, "MGA").format(:no_cents_if_whole => false, :symbol => false)).to eq "2,006.4"
-        expect(Money.new(10000, "VND").format(:no_cents_if_whole => false, :symbol => false)).to eq "1.000,0"
-        expect(Money.new(10034, "VND").format(:no_cents_if_whole => false, :symbol => false)).to eq "1.003,4"
+        expect(Money.new(10000, "VND").format(:no_cents_if_whole => false, :symbol => false)).to eq "10.000"
+        expect(Money.new(10034, "VND").format(:no_cents_if_whole => false, :symbol => false)).to eq "10.034"
         expect(Money.new(10000, "USD").format(:no_cents_if_whole => false, :symbol => false)).to eq "100.00"
         expect(Money.new(10034, "USD").format(:no_cents_if_whole => false, :symbol => false)).to eq "100.34"
         expect(Money.new(10000, "IQD").format(:no_cents_if_whole => false, :symbol => false)).to eq "10.000"
@@ -405,6 +454,10 @@ describe Money, "formatting" do
       it "inserts currency symbol after the amount when set to :after" do
         expect(Money.us_dollar(1_000_000_000_12).format(:symbol_position => :after)).to eq "1,000,000,000.12 $"
       end
+
+      it "raises an ArgumentError when passed an invalid option" do
+        expect{Money.euro(0).format(:symbol_position => :befor)}.to raise_error(ArgumentError)
+      end
     end
 
     describe ":sign_before_symbol option" do
@@ -474,15 +527,7 @@ describe Money, "formatting" do
       end
     end
 
-    describe ":rounded_infinite_precision option" do
-      before do
-        Money.infinite_precision = true
-      end
-
-      after do
-        Money.infinite_precision = false
-      end
-
+    describe ":rounded_infinite_precision option", :infinite_precision do
       it "does round fractional when set to true" do
         expect(Money.new(BigDecimal.new('12.1'), "USD").format(:rounded_infinite_precision => true)).to eq "$0.12"
         expect(Money.new(BigDecimal.new('12.5'), "USD").format(:rounded_infinite_precision => true)).to eq "$0.13"
@@ -503,15 +548,13 @@ describe Money, "formatting" do
         expect(Money.new(BigDecimal.new('1'), "MGA").format(:rounded_infinite_precision => false)).to eq "Ar0.1"
       end
 
-      describe ":rounded_infinite_precision option with i18n = false" do
+      describe "with i18n = false" do
         before do
           Money.use_i18n = false
-          Money.infinite_precision = true
         end
 
         after do
           Money.use_i18n = true
-          Money.infinite_precision = false
         end
 
         it 'does round fractional when set to true' do
@@ -522,6 +565,33 @@ describe Money, "formatting" do
 
           expect(Money.new(BigDecimal.new('100012.1'), "EUR").format(:rounded_infinite_precision => true)).to eq "€1.000,12"
           expect(Money.new(BigDecimal.new('100012.5'), "EUR").format(:rounded_infinite_precision => true)).to eq "€1.000,13"
+        end
+      end
+
+      describe "with i18n = true" do
+        before do
+          Money.use_i18n = true
+          reset_i18n
+          I18n.locale = :de
+          I18n.backend.store_translations(
+              :de,
+              :number => { :currency => { :format => { :delimiter => ".", :separator => "," } } }
+          )
+        end
+
+        after do
+          reset_i18n
+          I18n.locale = :en
+        end
+
+        it 'does round fractional when set to true' do
+          expect(Money.new(BigDecimal.new('12.1'), "USD").format(:rounded_infinite_precision => true)).to eq "$0,12"
+          expect(Money.new(BigDecimal.new('12.5'), "USD").format(:rounded_infinite_precision => true)).to eq "$0,13"
+          expect(Money.new(BigDecimal.new('123.1'), "BHD").format(:rounded_infinite_precision => true)).to eq "ب.د0,123"
+          expect(Money.new(BigDecimal.new('123.5'), "BHD").format(:rounded_infinite_precision => true)).to eq "ب.د0,124"
+          expect(Money.new(BigDecimal.new('100.1'), "USD").format(:rounded_infinite_precision => true)).to eq "$1,00"
+          expect(Money.new(BigDecimal.new('109.5'), "USD").format(:rounded_infinite_precision => true)).to eq "$1,10"
+          expect(Money.new(BigDecimal.new('1'), "MGA").format(:rounded_infinite_precision => true)).to eq "Ar0,2"
         end
       end
     end
@@ -625,5 +695,20 @@ describe Money, "formatting" do
       end
     end
 
+    describe ":drop_trailing_zeros option" do
+      specify "(:drop_trailing_zeros => true) works as documented" do
+        expect(Money.new(89000, "BTC").format(:drop_trailing_zeros => true, :symbol => false)).to eq "0.00089"
+        expect(Money.new(100089000, "BTC").format(:drop_trailing_zeros => true, :symbol => false)).to eq "1.00089"
+        expect(Money.new(100000000, "BTC").format(:drop_trailing_zeros => true, :symbol => false)).to eq "1"
+        expect(Money.new(110, "AUD").format(:drop_trailing_zeros => true, :symbol => false)).to eq "1.1"
+      end
+
+      specify "(:drop_trailing_zeros => false) works as documented" do
+        expect(Money.new(89000, "BTC").format(:drop_trailing_zeros => false, :symbol => false)).to eq "0.00089000"
+        expect(Money.new(100089000, "BTC").format(:drop_trailing_zeros => false, :symbol => false)).to eq "1.00089000"
+        expect(Money.new(100000000, "BTC").format(:drop_trailing_zeros => false, :symbol => false)).to eq "1.00000000"
+        expect(Money.new(110, "AUD").format(:drop_trailing_zeros => false, :symbol => false)).to eq "1.10"
+      end
+    end
   end
 end

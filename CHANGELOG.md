@@ -1,9 +1,62 @@
 # Changelog
 
-## Next release
+## 6.7.0
+ - Changed `Money#<=>` to return `nil` if the comparison is inappropriate. (#584)
+ - Remove implicit conversion of values being compared. Only accept `Money` and
+   subclasses of `Money` for comparisons and raise TypeError otherwise.
+ - When comparing fails due to `Money::Bank::UnknownRate` `Money#<=>` will now
+   return `nil` as `Comparable#==` will not rescue exceptions in the next release.
+ - Fix `Currency` specs for `#exponent` and `#decimal_places` not making assertions.
+ - Fix a couple of Ruby warnings found in specs.
+ - Fix `Money#-`,`Money#+` arithmetics for Ruby 2.3+ : check for zero value without using eql? with a Fixnum. (#577)
+ - Use `Money#decimal_mark` when formatting with `rounded_infinite_precision` rule
+   set to `true`.
+ - Replaced meta-defined `thousands_separator` and `decimal_mark` methods with regular methods. (#579)
+
+## 6.6.0
+ - Fixed VariableExchange#exchange_with for big numbers.
+ - Add Currency symbol translation support
+ - `Currency.all` raises a more helpful error message
+   (`Currency::MissingAttributeError`)if a currency has no priority
+ - `Currency` implements `Enumerable`.
+ - `Currency#<=>` sorts alphabetically by `id` if the `priority`s are the same,
+   and no longer raises an error if one of the priorities is missing.
+ - `Money::Currency.unregister` can take an ISO code argument in addition
+   to a hash.
+ - `Money::Currency.unregister` returns `true` if the given currency
+   previously existed, and `false` if it didn't.
+ - Fix symbol for SZL currency
+ - Trying to create a Currency without an `iso_code` now raises a more
+   helpful error message.
+ - Add `Money.usd`, `.cad` and `.eur` as aliases for `.us_dollar`,
+   `.ca_dollar`, and `.euro`.
+ - Add helper methods for British pounds: `Money.pound_sterling` and
+   `Money.gbp`.
+ - Add `Money.from_amount` to create money from a value in units instead of
+   fractional units.
+ - Changed CHF symbol from 'Fr' to 'CHF'
+ - Changed CLF exponent from 0 to 4
+ - Changed CLP subunit_to_unit from 1 to 100
+ - Minor fixes to prevent warnings on unused variables and the redefinition of
+   `Money.default_currency`
+ - `Money#==` changed to acknowledge that 0 in one currency is equal to 0 in any currency.
+ - Changed KRW subunit_to_unit from 100 to 1
+ - Decouple exchange rates storage from bank objects and formalize storage public API. Default is `Money::RatesStore::Memory`.
+ - `Currency.new` now a singleton by its id
+
+## 6.5.1
+ - Fix format for BYR currency
+
+## 6.5.0
  - Add method to round a given amount of money to the nearest possible value in cash (aka Swedish rounding).
  - Fixed the subunit_to_unit values of the CLP and KRW currencies
  - Add option for `disambiguate` symbols for formatting
+ - Fixed the subunit_to_unit values of the VND currency
+ - Fix formatting of NGN - show symbol before amount
+ - Switch default and alternate symbols for RUB currency
+ - Fix symbol for TRY currency
+ - Add `Money.default_formatting_rules` hash, meant to define default rules for everytime `Money#format` is called. They can be overwritten if provided on method call
+ - Add support for the new official symbol for Russian Ruble (RUB) — «₽»
 
 ## 6.2.1
  - Ensure set is loaded
