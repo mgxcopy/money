@@ -198,6 +198,19 @@ class Money
     # Note that the default rules can be defined through +Money.default_formatting_rules+ hash.
     #
     # @see +Money.default_formatting_rules+ for more information.
+    
+    def unformatted(*rules)
+      rules = normalize_formatting_rules(rules)
+      rules = localize_formatting_rules(rules)
+      
+      formatted = self.abs.to_s
+      
+      if rules[:precision]
+        #this is safe alternative to to_s("F") to keep floating zeros
+        BigDecimal(formatted).round(rules[:precision])
+      end
+    end  
+
     def format(*rules)
       # support for old format parameters
       rules = normalize_formatting_rules(rules)
@@ -217,6 +230,11 @@ class Money
       symbol_value = symbol_value_from(rules)
 
       formatted = self.abs.to_s
+      
+      if rules[:precision]
+        #this is safe alternative to to_s("F") to keep floating zeros
+        formatted = "%.#{rules[:precision]}f" % BigDecimal(formatted).round(rules[:precision])
+      end
 
       if rules[:precision]
         formatted = BigDecimal(formatted).round(rules[:precision]).to_s("F")
