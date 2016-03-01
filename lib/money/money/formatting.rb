@@ -236,9 +236,9 @@ class Money
         formatted = "%.#{rules[:precision]}f" % BigDecimal(formatted).round(rules[:precision])
       end
 
-      if rules[:precision]
-        formatted = BigDecimal(formatted).round(rules[:precision]).to_s("F")
-      end
+      #if rules[:precision]
+      #  formatted = BigDecimal(formatted).round(rules[:precision]).to_s("F")
+      #end
 
       if rules[:rounded_infinite_precision]
         formatted.gsub!(/#{decimal_mark}/, '.') unless '.' == decimal_mark
