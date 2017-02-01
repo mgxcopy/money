@@ -28,7 +28,7 @@ A Ruby Library for dealing with money and currency conversion.
   a monetary unit.
 - Represents monetary values as integers, in cents. This avoids floating point
   rounding errors.
-- Represents currency as `Money::Currency` instances providing an high level of
+- Represents currency as `Money::Currency` instances providing a high level of
   flexibility.
 - Provides APIs for exchanging money from one currency to another.
 
@@ -203,12 +203,12 @@ If you use Rails, then `environment.rb` is a very good place to put this.
 The exponent of a money value is the number of digits after the decimal
 separator (which separates the major unit from the minor unit). See e.g.
 [ISO 4217](http://www.currency-iso.org/en/shared/amendments/iso-4217-amendment.html) for more
-information.  You can find the exponent (as a `Float`) by
+information.  You can find the exponent (as an `Integer`) by
 
 ``` ruby
-Money::Currency.new("USD").exponent  # => 2.0
-Money::Currency.new("JPY").exponent  # => 0.0
-Money::Currency.new("MGA").exponent  # => 0.6989700043360189
+Money::Currency.new("USD").exponent  # => 2
+Money::Currency.new("JPY").exponent  # => 0
+Money::Currency.new("MGA").exponent  # => 1
 ```
 
 ### Currency Lookup
@@ -316,12 +316,12 @@ The following example implements an `ActiveRecord` store to save exchange rates 
 
 class ExchangeRate < ActiveRecord::Base
   def self.get_rate(from_iso_code, to_iso_code)
-    rate = find_by_from_and_to(from_iso_code, to_iso_code)
+    rate = find_by(:from => from_iso_code, :to => to_iso_code)
     rate.present? ? rate.rate : nil
   end
 
   def self.add_rate(from_iso_code, to_iso_code, rate)
-    exrate = find_or_initialize_by_from_and_to(from_iso_code, to_iso_code)
+    exrate = find_or_initialize_by(:from => from_iso_code, :to => to_iso_code)
     exrate.rate = rate
     exrate.save!
   end
@@ -369,13 +369,14 @@ implementations.
 
 - [eu_central_bank](https://github.com/RubyMoney/eu_central_bank)
 - [google_currency](https://github.com/RubyMoney/google_currency)
-- [money-json-rates](https://github.com/askuratovsky/money-json-rates)
+- [currencylayer](https://github.com/askuratovsky/currencylayer)
 - [nordea](https://github.com/matiaskorhonen/nordea)
 - [nbrb_currency](https://github.com/slbug/nbrb_currency)
 - [money-currencylayer-bank](https://github.com/phlegx/money-currencylayer-bank)
 - [money-open-exchange-rates](https://github.com/spk/money-open-exchange-rates)
 - [money-historical-bank](https://github.com/atwam/money-historical-bank)
 - [russian_central_bank](https://github.com/rmustafin/russian_central_bank)
+- [money-uphold-bank](https://github.com/subvisual/money-uphold-bank)
 
 ## Ruby on Rails
 

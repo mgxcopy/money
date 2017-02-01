@@ -1,5 +1,33 @@
 # Changelog
 
+## 6.8.1
+- Fixed issue with calling `format` on a frozen `Money` object
+
+## 6.8.0
+- Ruby 2.4.0 support
+- Fixed UZS syntax
+- Fixed HUF smallest denomination
+- Fixed ruby 1.9 issues
+- Fixed html entity for COP
+- Updated all currency decimals to ISO-4217
+- Fixed money allocation for negative amounts
+- Fixed symbol_first for RON
+- Fixed disambiguate option when symbol is set to true
+- Fixed thousands separator for CZK
+- Improved formatter performance by precaching I18n calls
+
+## 6.7.1
+- Changed DKK symbol from 'kr' to 'kr.'
+- Improved Money::Formatting#format docs
+- Updated VEF symbol from 'Bs F' to 'Bs'
+- `Currency#exponent` now returns Fixnum
+- Fixed coercion issues
+- Fixed edge case with explicit override of thousands separator and decimal mark
+- `Money#==` will now raise error for non-zero numeric values
+- Fixed divmod
+- Added disambiguation symbol to USD Dollar
+- Use disambiguation symbol when both disambiguate and symbol are true in `format` method
+
 ## 6.7.0
  - Changed `Money#<=>` to return `nil` if the comparison is inappropriate. (#584)
  - Remove implicit conversion of values being compared. Only accept `Money` and

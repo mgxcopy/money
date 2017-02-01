@@ -23,6 +23,7 @@ describe Money do
     end
 
     it "returns true if both amounts are zero, even if currency differs" do
+      allow_any_instance_of(Money).to receive(:exchange_to) { Money.usd(0) }
       expect(Money.new(0, "USD")).to eq Money.new(0, "USD")
       expect(Money.new(0, "USD")).to eq Money.new(0, "EUR")
       expect(Money.new(0, "USD")).to eq Money.new(0, "AUD")
@@ -44,6 +45,19 @@ describe Money do
       expect(Money.new(2_50, "USD")).to     eq klass.new(2_50, "USD")
       expect(Money.new(2_50, "USD")).not_to eq klass.new(3_00, "USD")
       expect(Money.new(1_00, "GBP")).not_to eq klass.new(1_00, "USD")
+    end
+
+    it 'allows comparison with zero' do
+      expect(Money.new(0, :usd)).to eq 0
+      expect(Money.new(0, :usd)).to eq 0.0
+      expect(Money.new(0, :usd)).to eq BigDecimal.new(0)
+      expect(Money.new(1, :usd)).to_not eq 0
+    end
+
+    it 'raises error for non-zero numerics' do
+      expect { Money.new(1_00, :usd) == 1 }.to raise_error ArgumentError
+      expect { Money.new(1_00, :usd) == -2.0 }.to raise_error ArgumentError
+      expect { Money.new(1_00, :usd) == Float::INFINITY }.to raise_error ArgumentError
     end
   end
 
@@ -108,16 +122,18 @@ describe Money do
       expect(Money.new(1_00) <=> klass.new(2_00)).to be < 0
     end
 
-    it "raises TypeError when used to compare with an object that doesn't inherit from Money" do
+    it "returns nill when comparing with an object that doesn't inherit from Money" do
       expect(Money.new(1_00) <=> 100).to be_nil
-
       expect(Money.new(1_00) <=> Object.new).to be_nil
-
       expect(Money.new(1_00) <=> Class).to be_nil
-
       expect(Money.new(1_00) <=> Kernel).to be_nil
-
       expect(Money.new(1_00) <=> /foo/).to be_nil
+    end
+
+    it 'compares with numeric 0' do
+      expect(Money.usd(1) < 0).to eq false
+      expect(Money.usd(1) > 0.0).to eq true
+      expect(Money.usd(0) >= 0.0).to eq true
     end
   end
 
@@ -160,7 +176,7 @@ describe Money do
       expect(Money.new(10_00, "USD") + other).to eq Money.new(19_00, "USD")
     end
 
-    it "adds Fixnum 0 to money and returns the same ammount" do
+    it "adds Integer 0 to money and returns the same ammount" do
       expect(Money.new(10_00) + 0).to eq Money.new(10_00)
     end
 
@@ -181,7 +197,7 @@ describe Money do
       expect(Money.new(10_00, "USD") - other).to eq Money.new(1_00, "USD")
     end
 
-    it "subtract Fixnum 0 to money and returns the same ammount" do
+    it "subtract Integer 0 to money and returns the same ammount" do
       expect(Money.new(10_00) - 0).to eq Money.new(10_00)
     end
 
@@ -192,7 +208,7 @@ describe Money do
   end
 
   describe "#*" do
-    it "multiplies Money by Fixnum and returns Money" do
+    it "multiplies Money by Integer and returns Money" do
       ts = [
         {:a => Money.new( 10, :USD), :b =>  4, :c => Money.new( 40, :USD)},
         {:a => Money.new( 10, :USD), :b => -4, :c => Money.new(-40, :USD)},
@@ -205,15 +221,15 @@ describe Money do
     end
 
     it "does not multiply Money by Money (same currency)" do
-      expect { Money.new( 10, :USD) * Money.new( 4, :USD) }.to raise_error(ArgumentError)
+      expect { Money.new(10, :USD) * Money.new(4, :USD) }.to raise_error(TypeError)
     end
 
     it "does not multiply Money by Money (different currency)" do
-      expect { Money.new( 10, :USD) * Money.new( 4, :EUR) }.to raise_error(ArgumentError)
+      expect { Money.new(10, :USD) * Money.new(4, :EUR) }.to raise_error(TypeError)
     end
 
     it "does not multiply Money by an object which is NOT a number" do
-      expect { Money.new( 10, :USD) *  'abc' }.to raise_error(ArgumentError)
+      expect { Money.new(10, :USD) *  'abc' }.to raise_error(TypeError)
     end
 
     it "preserves the class in the result when using a subclass of Money" do
@@ -223,7 +239,7 @@ describe Money do
   end
 
   describe "#/" do
-    it "divides Money by Fixnum and returns Money" do
+    it "divides Money by Integer and returns Money" do
       ts = [
         {:a => Money.new( 13, :USD), :b =>  4, :c => Money.new( 3, :USD)},
         {:a => Money.new( 13, :USD), :b => -4, :c => Money.new(-3, :USD)},
@@ -319,7 +335,7 @@ describe Money do
   end
 
   describe "#div" do
-    it "divides Money by Fixnum and returns Money" do
+    it "divides Money by Integer and returns Money" do
       ts = [
           {:a => Money.new( 13, :USD), :b =>  4, :c => Money.new( 3, :USD)},
           {:a => Money.new( 13, :USD), :b => -4, :c => Money.new(-3, :USD)},
@@ -372,11 +388,11 @@ describe Money do
   end
 
   describe "#divmod" do
-    it "calculates division and modulo with Fixnum" do
+    it "calculates division and modulo with Integer" do
       ts = [
           {:a => Money.new( 13, :USD), :b =>  4, :c => [Money.new( 3, :USD), Money.new( 1, :USD)]},
-          {:a => Money.new( 13, :USD), :b => -4, :c => [Money.new(-3, :USD), Money.new(-3, :USD)]},
-          {:a => Money.new(-13, :USD), :b =>  4, :c => [Money.new(-3, :USD), Money.new( 3, :USD)]},
+          {:a => Money.new( 13, :USD), :b => -4, :c => [Money.new(-4, :USD), Money.new(-3, :USD)]},
+          {:a => Money.new(-13, :USD), :b =>  4, :c => [Money.new(-4, :USD), Money.new( 3, :USD)]},
           {:a => Money.new(-13, :USD), :b => -4, :c => [Money.new( 3, :USD), Money.new(-1, :USD)]},
       ]
       ts.each do |t|
@@ -435,7 +451,7 @@ describe Money do
   end
 
   describe "#modulo" do
-    it "calculates modulo with Fixnum" do
+    it "calculates modulo with Integer" do
       ts = [
           {:a => Money.new( 13, :USD), :b =>  4, :c => Money.new( 1, :USD)},
           {:a => Money.new( 13, :USD), :b => -4, :c => Money.new(-3, :USD)},
@@ -474,7 +490,7 @@ describe Money do
   end
 
   describe "#%" do
-    it "calculates modulo with Fixnum" do
+    it "calculates modulo with Integer" do
       ts = [
           {:a => Money.new( 13, :USD), :b =>  4, :c => Money.new( 1, :USD)},
           {:a => Money.new( 13, :USD), :b => -4, :c => Money.new(-3, :USD)},
@@ -513,7 +529,7 @@ describe Money do
   end
 
   describe "#remainder" do
-    it "calculates remainder with Fixnum" do
+    it "calculates remainder with Integer" do
       ts = [
           {:a => Money.new( 13, :USD), :b =>  4, :c => Money.new( 1, :USD)},
           {:a => Money.new( 13, :USD), :b => -4, :c => Money.new( 1, :USD)},
@@ -607,23 +623,27 @@ describe Money do
     it "correctly handles <=>" do
       expect {
         2 < Money.new(2, 'USD')
-      }.to raise_exception(TypeError)
+      }.to raise_exception(ArgumentError)
 
       expect {
         2 > Money.new(2, 'USD')
-      }.to raise_exception(TypeError)
+      }.to raise_exception(ArgumentError)
 
       expect {
         2 <= Money.new(2, 'USD')
-      }.to raise_exception(TypeError)
+      }.to raise_exception(ArgumentError)
 
       expect {
         2 >= Money.new(2, 'USD')
-      }.to raise_exception(TypeError)
+      }.to raise_exception(ArgumentError)
 
-      expect {
-        2 <=> Money.new(2, 'USD')
-      }.to raise_exception(TypeError)
+      expect(2 <=> Money.new(2, 'USD')).to be_nil
+    end
+
+    it 'compares with numeric 0' do
+      expect(0 < Money.usd(1)).to eq true
+      expect(0.0 > Money.usd(1)).to eq false
+      expect(0.0 >= Money.usd(0)).to eq true
     end
 
     it "raises exceptions for all numeric types, not just Integer" do
@@ -638,6 +658,36 @@ describe Money do
       expect {
         BigDecimal(2) / Money.new(2, 'USD')
       }.to raise_exception(TypeError)
+    end
+  end
+
+  %w(+ - / <=> divmod remainder).each do |op|
+    describe "##{op}" do
+      subject { ->(other = self.other) { instance.send(op, other) } }
+      let(:instance) { Money.usd(1) }
+
+      context 'when conversions disallowed' do
+        around do |ex|
+          begin
+            old = Money.default_bank
+            Money.disallow_currency_conversion!
+            ex.run
+          ensure
+            Money.default_bank = old
+          end
+        end
+
+        context 'and other is money with different currency' do
+          let(:other) { Money.gbp(1) }
+          it { should raise_error Money::Bank::DifferentCurrencyError }
+
+          context 'even for zero' do
+            let(:instance) { Money.usd(0) }
+            let(:other) { Money.gbp(0) }
+            it { should raise_error Money::Bank::DifferentCurrencyError }
+          end
+        end
+      end
     end
   end
 end

@@ -45,8 +45,9 @@ class Money
       attr_reader :mutex, :store
 
       # Available formats for importing/exporting rates.
-      RATE_FORMATS = [:json, :ruby, :yaml]
+      RATE_FORMATS = [:json, :ruby, :yaml].freeze
       SERIALIZER_SEPARATOR = '_TO_'.freeze
+      FORMAT_SERIALIZERS = {:json => JSON, :ruby => Marshal, :yaml => YAML}.freeze
 
       # Initializes a new +Money::Bank::VariableExchange+ object.
       # It defaults to using an in-memory, thread safe store instance for
@@ -125,13 +126,13 @@ class Money
       end
 
       def exchange(fractional, rate, &block)
-        ex = (fractional * BigDecimal.new(rate.to_s)).to_f
+        ex = fractional * BigDecimal.new(rate.to_s)
         if block_given?
           yield ex
         elsif @rounding_method
           @rounding_method.call(ex)
         else
-          ex.to_s.to_d
+          ex
         end
       end
 
@@ -216,14 +217,7 @@ class Money
           RATE_FORMATS.include? format
 
         store.transaction do
-          s = case format
-          when :json
-            JSON.dump(rates)
-          when :ruby
-            Marshal.dump(rates)
-          when :yaml
-            YAML.dump(rates)
-          end
+          s = FORMAT_SERIALIZERS[format].dump(rates)
 
           unless file.nil?
             File.open(file, "w") {|f| f.write(s) }
@@ -264,14 +258,7 @@ class Money
           RATE_FORMATS.include? format
 
         store.transaction do
-          data = case format
-           when :json
-             JSON.load(s)
-           when :ruby
-             Marshal.load(s)
-           when :yaml
-             YAML.load(s)
-           end
+          data = FORMAT_SERIALIZERS[format].load(s)
 
           data.each do |key, rate|
             from, to = key.split(SERIALIZER_SEPARATOR)

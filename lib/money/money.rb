@@ -15,7 +15,9 @@ require "money/money/formatting"
 #
 # @see http://en.wikipedia.org/wiki/Money
 class Money
-  include Comparable, Money::Arithmetic, Money::Formatting
+  include Comparable
+  include Money::Arithmetic
+  include Money::Formatting
   extend Constructors
 
   # Raised when smallest denomination of a currency is not defined
@@ -34,17 +36,17 @@ class Money
   # The value of the monetary amount represented in the fractional or subunit
   # of the currency.
   #
-  # For example, in the US Dollar currency the fractional unit is cents, and
-  # there are 100 cents in one US Dollar. So given the Money representation of
+  # For example, in the US dollar currency the fractional unit is cents, and
+  # there are 100 cents in one US dollar. So given the Money representation of
   # one US dollar, the fractional interpretation is 100.
   #
-  # Another example is that of the Kuwaiti Dinar. In this case the fractional
-  # unit is the Fils and there 1000 Fils to one Kuwaiti Dinar. So given the
-  # Money representation of one Kuwaiti Dinar, the fractional interpretation is
+  # Another example is that of the Kuwaiti dinar. In this case the fractional
+  # unit is the fils and there 1000 fils to one Kuwaiti dinar. So given the
+  # Money representation of one Kuwaiti dinar, the fractional interpretation is
   # 1000.
   #
   # @return [Integer] when infinite_precision is false
-  # @return [BigDecimal] when infintie_precision is true
+  # @return [BigDecimal] when infinite_precision is true
   #
   # @see infinite_precision
   def fractional
@@ -56,7 +58,7 @@ class Money
   end
 
   # Round a given amount of money to the nearest possible amount in cash value. For
-  # example, in Swiss francs (CHF), the smallest possible amount of cash value is
+  # example, in Swiss franc (CHF), the smallest possible amount of cash value is
   # CHF 0.05. Therefore, this method rounds CHF 0.07 to CHF 0.05, and CHF 0.08 to
   # CHF 0.10.
   #
@@ -78,7 +80,7 @@ class Money
 
   # @!attribute [r] currency
   #   @return [Currency] The money's currency.
-  # @!attribute [r] bank 
+  # @!attribute [r] bank
   #   @return [Money::Bank::Base] The +Money::Bank+-based object which currency
   #     exchanges are performed with.
 
@@ -95,7 +97,7 @@ class Money
     #     one to specify custom exchange rates.
     #
     # @!attribute default_formatting_rules
-    #   @return [Hash] Use this to define a default hash of rules for everytime
+    #   @return [Hash] Use this to define a default hash of rules for every time
     #     +Money#format+ is called.  Rules provided on method call will be
     #     merged with the default ones.  To overwrite a rule, just provide the
     #     intended value while calling +format+.
@@ -115,7 +117,7 @@ class Money
     #   @return [Boolean] Use this to enable infinite precision cents
     #
     # @!attribute [rw] conversion_precision
-    #   @return [Fixnum] Use this to specify precision for converting Rational
+    #   @return [Integer] Use this to specify precision for converting Rational
     #     to BigDecimal
     attr_accessor :default_bank, :default_formatting_rules,
       :use_i18n, :infinite_precision, :conversion_precision
@@ -166,7 +168,7 @@ class Money
   setup_defaults
 
   # Use this to return the rounding mode.  You may also pass a
-  # rounding mode and a block to temporatly change it.  It will
+  # rounding mode and a block to temporarily change it.  It will
   # then return the results of the block instead.
   #
   # @param [BigDecimal::ROUND_MODE] mode
@@ -315,10 +317,10 @@ class Money
     @currency = Currency.wrap(val)
   end
 
-  # Returns a Fixnum hash value based on the +fractional+ and +currency+ attributes
+  # Returns a Integer hash value based on the +fractional+ and +currency+ attributes
   # in order to use functions like & (intersection), group_by, etc.
   #
-  # @return [Fixnum]
+  # @return [Integer]
   #
   # @example
   #   Money.new(100).hash #=> 908351
@@ -436,7 +438,7 @@ class Money
   end
 
   # Receive a money object with the same amount as the current Money object
-  # in american dollars.
+  # in United States dollar.
   #
   # @return [Money]
   #
@@ -448,7 +450,7 @@ class Money
   end
 
   # Receive a money object with the same amount as the current Money object
-  # in canadian dollar.
+  # in Canadian dollar.
   #
   # @return [Money]
   #
@@ -494,7 +496,9 @@ class Money
     amounts, left_over = amounts_from_splits(allocations, splits)
 
     unless self.class.infinite_precision
-      left_over.to_i.times { |i| amounts[i % amounts.length] += 1 }
+      delta = left_over > 0 ? 1 : -1
+      # Distribute left over pennies amongst allocations
+      left_over.to_i.abs.times { |i| amounts[i % amounts.length] += delta }
     end
 
     amounts.collect { |fractional| self.class.new(fractional, currency) }
@@ -547,7 +551,7 @@ class Money
     if num.respond_to?(:to_d)
       num.is_a?(Rational) ? num.to_d(self.class.conversion_precision) : num.to_d
     else
-      BigDecimal.new(num.to_s)
+      BigDecimal.new(num.to_s.empty? ? 0 : num.to_s)
     end
   end
 
@@ -590,7 +594,7 @@ class Money
       if self.class.infinite_precision
         fractional * ratio
       else
-        (fractional * ratio / allocations).floor.tap do |frac|
+        (fractional * ratio / allocations).truncate.tap do |frac|
           left_over -= frac
         end
       end

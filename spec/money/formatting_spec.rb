@@ -110,6 +110,16 @@ describe Money, "formatting" do
         expect(money.format(:translate => true)).to eq("CAD$0.00")
       end
     end
+
+    context "with overridden i18n settings" do
+      it "should respect explicit overriding of thousands_separator/delimiter when decimal_mark/separator collide and there’s no decimal component for currencies that have no subunit" do
+        expect(Money.new(300_000, 'ISK').format(:thousands_separator => ".", decimal_mark: ',')).to eq "kr300.000"
+      end
+
+      it "should respect explicit overriding of thousands_separator/delimiter when decimal_mark/separator collide and there’s no decimal component for currencies with subunits that drop_trailing_zeros" do
+        expect(Money.new(300_000, 'USD').format(:thousands_separator => ".", decimal_mark: ',', drop_trailing_zeros: true)).to eq "$3.000"
+      end
+    end
   end
 
   describe "#format" do
@@ -418,6 +428,20 @@ describe Money, "formatting" do
       it "defaults to ',' if currency isn't recognized" do
         expect(Money.new(100000, "ZWD").format).to eq "$1,000.00"
       end
+
+      context "without i18n" do
+        before { Money.use_i18n = false }
+
+        it "should respect explicit overriding of thousands_separator/delimiter when decimal_mark/separator collide and there’s no decimal component for currencies that have no subunit" do
+          expect(Money.new(300_000, 'ISK').format(:thousands_separator => ",", decimal_mark: '.')).to eq "kr300,000"
+        end
+
+        it "should respect explicit overriding of thousands_separator/delimiter when decimal_mark/separator collide and there’s no decimal component for currencies with subunits that drop_trailing_zeros" do
+          expect(Money.new(300_000, 'USD').format(:thousands_separator => ".", decimal_mark: ',', drop_trailing_zeros: true)).to eq "$3.000"
+        end
+
+        after { Money.use_i18n = true}
+      end
     end
 
     describe ":thousands_separator and :decimal_mark option" do
@@ -435,7 +459,7 @@ describe Money, "formatting" do
 
       specify "should fallback to symbol if entity is not available" do
         string = Money.new(570, 'DKK').format(:html => true)
-        expect(string).to eq "5,70 kr"
+        expect(string).to eq "5,70 kr."
       end
     end
 
@@ -662,7 +686,7 @@ describe Money, "formatting" do
     it "returns ambiguous signs when disambiguate is not set" do
       expect(Money.new(1999_98, "USD").format).to eq("$1,999.98")
       expect(Money.new(1999_98, "CAD").format).to eq("$1,999.98")
-      expect(Money.new(1999_98, "DKK").format).to eq("1.999,98 kr")
+      expect(Money.new(1999_98, "DKK").format).to eq("1.999,98 kr.")
       expect(Money.new(1999_98, "NOK").format).to eq("1.999,98 kr")
       expect(Money.new(1999_98, "SEK").format).to eq("1 999,98 kr")
     end
@@ -670,17 +694,33 @@ describe Money, "formatting" do
     it "returns ambiguous signs when disambiguate is false" do
       expect(Money.new(1999_98, "USD").format(disambiguate: false)).to eq("$1,999.98")
       expect(Money.new(1999_98, "CAD").format(disambiguate: false)).to eq("$1,999.98")
-      expect(Money.new(1999_98, "DKK").format(disambiguate: false)).to eq("1.999,98 kr")
+      expect(Money.new(1999_98, "DKK").format(disambiguate: false)).to eq("1.999,98 kr.")
       expect(Money.new(1999_98, "NOK").format(disambiguate: false)).to eq("1.999,98 kr")
       expect(Money.new(1999_98, "SEK").format(disambiguate: false)).to eq("1 999,98 kr")
     end
 
     it "returns disambiguate signs when disambiguate: true" do
-      expect(Money.new(1999_98, "USD").format(disambiguate: true)).to eq("$1,999.98")
+      expect(Money.new(1999_98, "USD").format(disambiguate: true)).to eq("US$1,999.98")
       expect(Money.new(1999_98, "CAD").format(disambiguate: true)).to eq("C$1,999.98")
       expect(Money.new(1999_98, "DKK").format(disambiguate: true)).to eq("1.999,98 DKK")
       expect(Money.new(1999_98, "NOK").format(disambiguate: true)).to eq("1.999,98 NOK")
       expect(Money.new(1999_98, "SEK").format(disambiguate: true)).to eq("1 999,98 SEK")
+    end
+
+    it "returns disambiguate signs when disambiguate: true and symbol: true" do
+      expect(Money.new(1999_98, "USD").format(disambiguate: true, symbol: true)).to eq("US$1,999.98")
+      expect(Money.new(1999_98, "CAD").format(disambiguate: true, symbol: true)).to eq("C$1,999.98")
+      expect(Money.new(1999_98, "DKK").format(disambiguate: true, symbol: true)).to eq("1.999,98 DKK")
+      expect(Money.new(1999_98, "NOK").format(disambiguate: true, symbol: true)).to eq("1.999,98 NOK")
+      expect(Money.new(1999_98, "SEK").format(disambiguate: true, symbol: true)).to eq("1 999,98 SEK")
+    end
+
+    it "returns no signs when disambiguate: true and symbol: false" do
+      expect(Money.new(1999_98, "USD").format(disambiguate: true, symbol: false)).to eq("1,999.98")
+      expect(Money.new(1999_98, "CAD").format(disambiguate: true, symbol: false)).to eq("1,999.98")
+      expect(Money.new(1999_98, "DKK").format(disambiguate: true, symbol: false)).to eq("1.999,98")
+      expect(Money.new(1999_98, "NOK").format(disambiguate: true, symbol: false)).to eq("1.999,98")
+      expect(Money.new(1999_98, "SEK").format(disambiguate: true, symbol: false)).to eq("1 999,98")
     end
 
     it "should never return an ambiguous format with disambiguate: true" do

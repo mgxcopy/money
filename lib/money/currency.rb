@@ -314,10 +314,10 @@ class Money
     end
     private :compare_ids
 
-    # Returns a Fixnum hash value based on the +id+ attribute in order to use
+    # Returns a Integer hash value based on the +id+ attribute in order to use
     # functions like & (intersection), group_by, etc.
     #
-    # @return [Fixnum]
+    # @return [Integer]
     #
     # @example
     #   Money::Currency.new(:usd).hash #=> 428936
@@ -374,7 +374,7 @@ class Money
       id.to_s.upcase.to_sym
     end
 
-    # Conversation to +self+.
+    # Conversion to +self+.
     #
     # @return [self]
     def to_currency
@@ -392,14 +392,17 @@ class Money
       !!@symbol_first
     end
 
-    # Returns the number of digits after the decimal separator.
+    # Returns the relation between subunit and unit as a base 10 exponent.
     #
-    # @return [Float]
+    # Note that MGA and MRO are exceptions and are rounded to 1
+    # @see https://en.wikipedia.org/wiki/ISO_4217#Active_codes
+    #
+    # @return [Integer]
     def exponent
-      Math.log10(@subunit_to_unit)
+      Math.log10(@subunit_to_unit).round
     end
 
-    # Cache decimal places for subunit_to_unit values.  Common ones pre-cached.
+    # Cache decimal places for subunit_to_unit values. Common ones pre-cached.
     def self.decimal_places_cache
       @decimal_places_cache ||= {1 => 0, 10 => 1, 100 => 2, 1000 => 3}
     end

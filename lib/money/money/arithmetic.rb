@@ -1,18 +1,13 @@
 class Money
-  CoercedNumber = Struct.new(:value) do
-    include Comparable
-
-    def +(other) raise TypeError; end
-    def -(other) raise TypeError; end
-    def /(other) raise TypeError; end
-    def <=>(other) raise TypeError; end
-
-    def *(other)
-      other * value
-    end
-  end
-
   module Arithmetic
+    # Wrapper for coerced numeric values to distinguish
+    # when numeric was on the 1st place in operation.
+    CoercedNumeric = Struct.new(:value) do
+      # Proxy #zero? method to skip unnecessary typecasts. See #- and #+.
+      def zero?
+        value.zero?
+      end
+    end
 
     # Returns a money object with changed polarity.
     #
@@ -53,18 +48,27 @@ class Money
     #
     # @param [Money] other_money Value to compare with.
     #
-    # @return [Fixnum]
+    # @return [Integer]
     #
     # @raise [TypeError] when other object is not Money
     #
-    def <=>(other_money)
-      return nil unless other_money.is_a?(Money)
-      if fractional != 0 && other_money.fractional != 0 && currency != other_money.currency
-        other_money = other_money.exchange_to(currency)
+    def <=>(other)
+      unless other.is_a?(Money)
+        return unless other.respond_to?(:zero?) && other.zero?
+        return other.is_a?(CoercedNumeric) ? 0 <=> fractional : fractional <=> 0
       end
-      fractional <=> other_money.fractional
+      other = other.exchange_to(currency)
+      fractional <=> other.fractional
     rescue Money::Bank::UnknownRate
-      nil
+    end
+
+    # Uses Comparable's implementation but raises ArgumentError if non-zero
+    # numeric value is given.
+    def ==(other)
+      if other.is_a?(Numeric) && !other.zero?
+        raise ArgumentError, 'Money#== supports only zero numerics'
+      end
+      super
     end
 
     # Test if the amount is positive. Returns +true+ if the money amount is
@@ -93,6 +97,7 @@ class Money
       fractional < 0
     end
 
+    # @method +(other)
     # Returns a new Money object containing the sum of the two operands' monetary
     # values. If +other_money+ has a different currency then its monetary value
     # is automatically exchanged to this object's currency using +exchange_to+.
@@ -103,13 +108,8 @@ class Money
     #
     # @example
     #   Money.new(100) + Money.new(100) #=> #<Money @fractional=200>
-    def +(other_money)
-      return self if other_money.zero?
-      raise TypeError unless other_money.is_a?(Money)
-      other_money = other_money.exchange_to(currency)
-      self.class.new(fractional + other_money.fractional, currency)
-    end
-
+    #
+    # @method -(other)
     # Returns a new Money object containing the difference between the two
     # operands' monetary values. If +other_money+ has a different currency then
     # its monetary value is automatically exchanged to this object's currency
@@ -121,11 +121,15 @@ class Money
     #
     # @example
     #   Money.new(100) - Money.new(99) #=> #<Money @fractional=1>
-    def -(other_money)
-      return self if other_money.zero?
-      raise TypeError unless other_money.is_a?(Money)
-      other_money = other_money.exchange_to(currency)
-      self.class.new(fractional - other_money.fractional, currency)
+    [:+, :-].each do |op|
+      define_method(op) do |other|
+        unless other.is_a?(Money)
+          return self if other.zero?
+          raise TypeError
+        end
+        other = other.exchange_to(currency)
+        self.class.new(fractional.public_send(op, other.fractional), currency)
+      end
     end
 
     # Multiplies the monetary value with the given number and returns a new
@@ -137,16 +141,17 @@ class Money
     #
     # @return [Money] The resulting money.
     #
-    # @raise [ArgumentError] If +value+ is NOT a number.
+    # @raise [TypeError] If +value+ is NOT a number.
     #
     # @example
     #   Money.new(100) * 2 #=> #<Money @fractional=200>
     #
     def *(value)
+      value = value.value if value.is_a?(CoercedNumeric)
       if value.is_a? Numeric
         self.class.new(fractional * value, currency)
       else
-        raise ArgumentError, "Can't multiply a #{self.class.name} by a #{value.class.name}'s value"
+        raise TypeError, "Can't multiply a #{self.class.name} by a #{value.class.name}'s value"
       end
     end
 
@@ -169,6 +174,7 @@ class Money
       if value.is_a?(self.class)
         fractional / as_d(value.exchange_to(currency).fractional).to_f
       else
+        raise TypeError, 'Can not divide by Money' if value.is_a?(CoercedNumeric)
         self.class.new(fractional / as_d(value), currency)
       end
     end
@@ -189,9 +195,9 @@ class Money
     # Divide money by money or fixnum and return array containing quotient and
     # modulus.
     #
-    # @param [Money, Fixnum] val Number to divmod by.
+    # @param [Money, Integer] val Number to divmod by.
     #
-    # @return [Array<Money,Money>,Array<Fixnum,Money>]
+    # @return [Array<Money,Money>,Array<Integer,Money>]
     #
     # @example
     #   Money.new(100).divmod(9)            #=> [#<Money @fractional=11>, #<Money @fractional=1>]
@@ -212,18 +218,14 @@ class Money
     private :divmod_money
 
     def divmod_other(val)
-      if self.class.infinite_precision
-        quotient, remainder = fractional.divmod(as_d(val))
-        [self.class.new(quotient, currency), self.class.new(remainder, currency)]
-      else
-        [div(val), self.class.new(fractional.modulo(val), currency)]
-      end
+      quotient, remainder = fractional.divmod(as_d(val))
+      [self.class.new(quotient, currency), self.class.new(remainder, currency)]
     end
     private :divmod_other
 
     # Equivalent to +self.divmod(val)[1]+
     #
-    # @param [Money, Fixnum] val Number take modulo with.
+    # @param [Money, Integer] val Number take modulo with.
     #
     # @return [Money]
     #
@@ -236,7 +238,7 @@ class Money
 
     # Synonym for +#modulo+.
     #
-    # @param [Money, Fixnum] val Number take modulo with.
+    # @param [Money, Integer] val Number take modulo with.
     #
     # @return [Money]
     #
@@ -247,7 +249,7 @@ class Money
 
     # If different signs +self.modulo(val) - val+ otherwise +self.modulo(val)+
     #
-    # @param [Money, Fixnum] val Number to rake remainder with.
+    # @param [Money, Integer] val Number to rake remainder with.
     #
     # @return [Money]
     #
@@ -304,7 +306,7 @@ class Money
     # @example
     #   2 * Money.new(10) #=> #<Money @fractional=20>
     def coerce(other)
-      [CoercedNumber.new(other), self]
+      [self, CoercedNumeric.new(other)]
     end
   end
 end
